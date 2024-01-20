@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"log"
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +21,7 @@ func NewApp() *App {
 
 func (app *App) ApiSampleSetup(g *gin.Engine) {
 	setupPrometheus(g)
-	g.GET("/api/samples", GetSamples)
+	g.GET("/api/samples", app.GetSamples)
 }
 
 func setupPrometheus(r *gin.Engine) {
@@ -27,8 +29,31 @@ func setupPrometheus(r *gin.Engine) {
 	p.Use(r)
 }
 
-func GetSamples(c *gin.Context) {
+type Sample struct {
+	Id   string
+	Name string
+}
 
+func (app *App) GetSamples(c *gin.Context) {
+	rows, err := app.db.Query(context.Background(), "select * from sample")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var result []Sample
+	for rows.Next() {
+		var r Sample
+		err := rows.Scan(&r.Id, &r.Name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result = append(result, r)
+	}
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func setupDatabase() *pgxpool.Pool {
